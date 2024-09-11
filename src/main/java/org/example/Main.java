@@ -142,19 +142,24 @@ public class Main {
         }
         return mass;
     }
-    public static byte[] encryption(byte[] bytes,byte[] key){
+    public static byte[] encryption(byte[] bytes,byte[] key,byte[] vectorInitialize){
         byte[] encrypted = new byte[bytes.length];
         for(int i = 0;i  < (bytes.length / 8);i++){
-            byte[] j = feistelEncrypt(Arrays.copyOfRange(bytes,i*8,8+i*8),key,10,2);
+            byte[] j = feistelEncrypt(byteXor(Arrays.copyOfRange(bytes,i*8,8+i*8),vectorInitialize),key,10,2);
             System.arraycopy(j,0,encrypted,i*8,j.length);
+            System.arraycopy(j,0,vectorInitialize,0,j.length);
         }
         return encrypted;
     }
-    public static byte[] decryption(byte[] bytes, byte[] key){
+    //decryption for cbc mode
+    public static byte[] decryption(byte[] bytes, byte[] key,byte[] vectorInitialize){
         byte[] decrypted = new byte[bytes.length];
         for(int i = 0;i  < (bytes.length / 8);i++){
-            byte[] j = feistelDecrypt(Arrays.copyOfRange(bytes,i*8,8+i*8),key,10,2);
+            byte[] temp = new byte[vectorInitialize.length];
+            System.arraycopy(Arrays.copyOfRange(bytes,i*8,8+i*8),0,temp,0,temp.length);
+            byte[] j = byteXor(feistelDecrypt(Arrays.copyOfRange(bytes,i*8,8+i*8),key,10,2),vectorInitialize);
             System.arraycopy(j,0,decrypted,i*8,j.length);
+            System.arraycopy(temp,0,vectorInitialize,0,temp.length);
         }
         return decrypted;
     }
@@ -163,9 +168,14 @@ public class Main {
         byte[] key = new byte[8];
         Random random = new SecureRandom();
         random.nextBytes(key);
+        byte[] vectorInitialize = new byte[8];
+        random.nextBytes(vectorInitialize);
         byte[] data = reader("pom.xml");
-        byte[] encrypted = encryption(data, key);
-        byte[] decrypted = decryption(encrypted, key);
+        byte[] encrypted = encryption(data, key,Arrays.copyOf(vectorInitialize,8));
+        System.out.println(Arrays.toString(encrypted));
+        byte[] decrypted = decryption(encrypted, key,vectorInitialize);
+        System.out.println(Arrays.toString(decrypted));
+        System.out.println(Arrays.toString(data));
         writer(decrypted);
     }
 }
