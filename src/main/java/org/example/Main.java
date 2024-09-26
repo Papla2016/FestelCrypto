@@ -7,7 +7,7 @@ import java.util.Random;
 
 public class Main {
     static int addedBytes = 0;
-    //I|O methods
+    static int rounds = 10;
 
     public static byte[] reader(String name) throws Exception {
         InputStream fis = new FileInputStream(name);
@@ -71,14 +71,14 @@ public class Main {
         return result;
     }
 
-    public static byte[] feistelEncrypt(byte[] blocks, byte[] key, int rounds,int blockLength) {
+    public static byte[] feistelEncrypt(byte[] blocks, byte[][] key, int rounds,int blockLength) {
         byte[] X0 = Arrays.copyOfRange(blocks, 0, blockLength);
         byte[] X1 = Arrays.copyOfRange(blocks, blockLength, blockLength * 2);
         byte[] X2 = Arrays.copyOfRange(blocks, blockLength * 2, blockLength * 3);
         byte[] X3 = Arrays.copyOfRange(blocks, blockLength * 3, blockLength * 4);
 
         for (int i = 0; i < rounds; i++) {
-            byte[] rangeKey = keyChanche(key,i);
+            byte[] rangeKey = key[i];
             byte[] newX0 = byteXor(X2,rangeKey) ;
             byte[] newX1 = X0;
             byte[] newX2 = byteXor(byteXor(X3,feistelRound(X0,X1)),newX0);
@@ -93,14 +93,14 @@ public class Main {
 
         return getBytes(blocks, blockLength, X0, X1, X2, X3);
     }
-    public static byte[] feistelDecrypt(byte[] blocks, byte[] key, int rounds,int blockLength) {
+    public static byte[] feistelDecrypt(byte[] blocks, byte[][] key, int rounds,int blockLength) {
         byte[] X0 = Arrays.copyOfRange(blocks, 0, blockLength);
         byte[] X1 = Arrays.copyOfRange(blocks, blockLength, blockLength * 2);
         byte[] X2 = Arrays.copyOfRange(blocks, blockLength * 2, blockLength * 3);
         byte[] X3 = Arrays.copyOfRange(blocks, blockLength * 3, blockLength * 4);
 
         for (int i = rounds - 1; i >= 0; i--) {
-            byte[] roundKey = keyChanche(key,i);
+            byte[] roundKey = key[i];
             byte[] newX0 =  X1;
             byte[] newX1 = X3;
             byte[] newX2 = byteXor(X0,roundKey);
@@ -142,40 +142,87 @@ public class Main {
         }
         return mass;
     }
-    public static byte[] encryption(byte[] bytes,byte[] key,byte[] vectorInitialize){
+    public static byte[] encryptionCBC(byte[] bytes, byte[][] key, byte[] vectorInitialize){
         byte[] encrypted = new byte[bytes.length];
         for(int i = 0;i  < (bytes.length / 8);i++){
-            byte[] j = feistelEncrypt(byteXor(Arrays.copyOfRange(bytes,i*8,8+i*8),vectorInitialize),key,10,2);
+            byte[] j = feistelEncrypt(byteXor(Arrays.copyOfRange(bytes,i*8,8+i*8),vectorInitialize),key,rounds,2);
             System.arraycopy(j,0,encrypted,i*8,j.length);
             System.arraycopy(j,0,vectorInitialize,0,j.length);
         }
         return encrypted;
     }
     //decryption for cbc mode
-    public static byte[] decryption(byte[] bytes, byte[] key,byte[] vectorInitialize){
+    public static byte[] decryptionCBC(byte[] bytes, byte[][] key, byte[] vectorInitialize){
         byte[] decrypted = new byte[bytes.length];
         for(int i = 0;i  < (bytes.length / 8);i++){
             byte[] temp = new byte[vectorInitialize.length];
             System.arraycopy(Arrays.copyOfRange(bytes,i*8,8+i*8),0,temp,0,temp.length);
-            byte[] j = byteXor(feistelDecrypt(Arrays.copyOfRange(bytes,i*8,8+i*8),key,10,2),vectorInitialize);
+            byte[] j = byteXor(feistelDecrypt(Arrays.copyOfRange(bytes,i*8,8+i*8),key,rounds,2),vectorInitialize);
             System.arraycopy(j,0,decrypted,i*8,j.length);
             System.arraycopy(temp,0,vectorInitialize,0,temp.length);
         }
         return decrypted;
     }
+    public static byte[] encryptionOFB(byte[] bytes, byte[][] key, byte[] vectorInitialize){
+        byte[] encrypted = new byte[bytes.length];
+        for(int i = 0;i  < (bytes.length / 8);i++){
+            byte[] tempEncrypt = feistelEncrypt(vectorInitialize,key,rounds,2);
+            byte[] j = byteXor(tempEncrypt,Arrays.copyOfRange(bytes,i*8,8+i*8));
+            System.arraycopy(j,0,encrypted,i*8,j.length);
+            System.arraycopy(tempEncrypt,0,vectorInitialize,0,j.length);
+        }
+        return encrypted;
+    }
+    public static byte[] decryptionOFB(byte[] bytes, byte[][] key, byte[] vectorInitialize){
+        byte[] decrypted = new byte[bytes.length];
+        for(int i = 0;i  < (bytes.length / 8);i++){
+            byte[] tempDecrypt = feistelEncrypt(vectorInitialize,key,rounds,2);
+            byte[] j = byteXor(tempDecrypt,Arrays.copyOfRange(bytes,i*8,8+i*8));
+            System.arraycopy(j,0,decrypted,i*8,j.length);
+            System.arraycopy(tempDecrypt,0,vectorInitialize,0,tempDecrypt.length);
+        }
+        return decrypted;
+    }
+    public static byte[] encryptionCFB(byte[] bytes, byte[][] key, byte[] vectorInitialize){
+        byte[] encrypted = new byte[bytes.length];
+        for(int i = 0;i  < (bytes.length / 8);i++){
+            byte[] tempEncrypt = feistelEncrypt(vectorInitialize,key,rounds,2);
+            byte[] j = byteXor(tempEncrypt,Arrays.copyOfRange(bytes,i*8,8+i*8));
+            System.arraycopy(j,0,encrypted,i*8,j.length);
+            System.arraycopy(j,0,vectorInitialize,0,j.length);
+        }
+        return encrypted;
+    }
+    public static byte[] decryptionCFB(byte[] bytes, byte[][] key, byte[] vectorInitialize){
+        byte[] decrypted = new byte[bytes.length];
+        for(int i = 0;i  < (bytes.length / 8);i++){
+            byte[] tempDecrypt = feistelEncrypt(vectorInitialize,key,rounds,2);
+            byte[] j = byteXor(tempDecrypt,Arrays.copyOfRange(bytes,i*8,8+i*8));
+            System.arraycopy(j,0,decrypted,i*8,j.length);
+            System.arraycopy(Arrays.copyOfRange(bytes,i*8,8+i*8),0,vectorInitialize,0,tempDecrypt.length);
+        }
+        return decrypted;
+    }
+    public static byte[][] genKeysArray(byte[] key,int rounds){
+        byte[][] roundKeys = new byte[rounds][];
+        for (int i = 0;i < rounds;i++) {
+            roundKeys[i] = keyChanche(key, i);
+        }
+        return roundKeys;
+    }
+
 
     public static void main(String[] args) throws Exception {
         byte[] key = new byte[8];
         Random random = new SecureRandom();
         random.nextBytes(key);
+        byte[][] keys = genKeysArray(key,rounds);
         byte[] vectorInitialize = new byte[8];
         random.nextBytes(vectorInitialize);
-        byte[] data = reader("pom.xml");
-        byte[] encrypted = encryption(data, key,Arrays.copyOf(vectorInitialize,8));
+        byte[] data = reader("src//main//java//org//example//Main.java");
+        byte[] encrypted = encryptionCFB(data, keys,Arrays.copyOf(vectorInitialize,8));
         System.out.println(Arrays.toString(encrypted));
-        byte[] decrypted = decryption(encrypted, key,vectorInitialize);
-        System.out.println(Arrays.toString(decrypted));
-        System.out.println(Arrays.toString(data));
+        byte[] decrypted = decryptionCFB(encrypted, keys,vectorInitialize);
         writer(decrypted);
     }
 }
