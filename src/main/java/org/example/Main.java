@@ -2,12 +2,16 @@ package org.example;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.Random;
+import java.util.*;
 
 public class Main {
     static int addedBytes = 0;
     static int rounds = 10;
+    public static byte[] longToBytes(long x) {
+        ByteBuffer buffer = ByteBuffer.allocate(Long.BYTES);
+        buffer.putLong(x);
+        return buffer.array();
+    }
 
     public static byte[] reader(String name) throws Exception {
         InputStream fis = new FileInputStream(name);
@@ -69,6 +73,10 @@ public class Main {
             result[i] = (byte) ((block1[i] >>> 7) ^ (~block2[i]));
         }
         return result;
+    }
+    public static byte[] feistelEncrypt(byte[] blocks, byte[] key, int rounds,int blockLength) {
+        byte[][] keys = genKeysArray(key,rounds);
+        return feistelEncrypt(blocks,keys,rounds,blockLength);
     }
 
     public static byte[] feistelEncrypt(byte[] blocks, byte[][] key, int rounds,int blockLength) {
@@ -210,19 +218,60 @@ public class Main {
         }
         return roundKeys;
     }
-
-
+    public static byte[] generateHash(byte[] key,byte[] bytes,byte[][] keys){
+        return byteXor(feistelEncrypt(byteXor(bytes,key),keys,rounds,2),bytes);
+    }
     public static void main(String[] args) throws Exception {
         byte[] key = new byte[8];
         Random random = new SecureRandom();
         random.nextBytes(key);
-        byte[][] keys = genKeysArray(key,rounds);
         byte[] vectorInitialize = new byte[8];
         random.nextBytes(vectorInitialize);
-        byte[] data = reader("src//main//java//org//example//Main.java");
-        byte[] encrypted = encryptionCFB(data, keys,Arrays.copyOf(vectorInitialize,8));
-        System.out.println(Arrays.toString(encrypted));
-        byte[] decrypted = decryptionCFB(encrypted, keys,vectorInitialize);
-        writer(decrypted);
+        byte[][] keys = genKeysArray(key,rounds);
+        byte[] data = reader("for_collision.txt");
+        System.out.println(Arrays.toString(encryptionCBC(data, keys, vectorInitialize)));
+
+//        byte[] encrypted = generateHash(vectorInitialize,data);
+//        collision(keys,key);
+    }
+    public static void collision(byte[][] keys,byte[] key){
+        long counter = 0;
+        Map<ByteArrayWrapper,Long> set = new HashMap<>();
+        do{
+            ByteArrayWrapper temp = new ByteArrayWrapper(generateHash(key,longToBytes(counter),keys));
+            if (set.containsKey(temp)){
+                System.out.println("коллизия- "+ counter + " c другим ключом - "+set.get(temp));
+            }else{
+                set.put(temp,counter);
+            }
+            counter++;
+        } while (counter != 0);
+    }
+    public static void birthday(){
+
+    }
+}
+class ByteArrayWrapper {
+    private final byte[] array;
+
+    public ByteArrayWrapper(byte[] array) {
+        this.array = array;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ByteArrayWrapper that = (ByteArrayWrapper) o;
+        return Arrays.equals(array, that.array);
+    }
+
+    @Override
+    public int hashCode() {
+        return Arrays.hashCode(array);
+    }
+    @Override
+    public String toString(){
+        return Arrays.toString(this.array);
     }
 }
